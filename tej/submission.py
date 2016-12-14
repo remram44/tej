@@ -243,7 +243,8 @@ class RemoteQueue(object):
     PROTOCOL_VERSION = 0, 2
 
     def __init__(self, destination, queue,
-                 setup_runtime=None, need_runtime=None):
+                 setup_runtime=None, need_runtime=None,
+                 missing_host_key_policy=paramiko.RejectPolicy()):
         """Creates a queue object, that represents a job queue on a server.
 
         :param destination: The address of the server, used to SSH into it.
@@ -259,6 +260,9 @@ class RemoteQueue(object):
         the queue already exists on the server and this argument is not None,
         the installed runtime will be matched against it, and a failure will be
         reported if it is not one of the provided values.
+        :param missing_host_key_policy: A paramiko.client.MissingHostKeyPolicy
+        for the case the hostname could not be found in the known_hosts file.
+        The default behavior is reject those connections.
         """
         if isinstance(destination, string_types):
             self.destination = parse_ssh_destination(destination)
@@ -276,6 +280,7 @@ class RemoteQueue(object):
             self.need_runtime = None
         self.queue = PosixPath(queue)
         self._ssh = None
+        self._missing_host_key_policy = missing_host_key_policy
         self._connect()
 
     def server_logger(self):
@@ -295,7 +300,7 @@ class RemoteQueue(object):
         """
         self._ssh = paramiko.SSHClient()
         self._ssh.load_system_host_keys()
-        self._ssh.set_missing_host_key_policy(paramiko.RejectPolicy())
+        self._ssh.set_missing_host_key_policy(self._missing_host_key_policy)
         logger.debug("Connecting with %s",
                      ', '.join('%s=%r' % (k, v if k != "password" else "***")
                                for k, v in iteritems(self.destination)))
